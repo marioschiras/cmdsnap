@@ -6,10 +6,51 @@ CMDSNAP_LAST_OUTPUT_FILE="$CMDSNAP_DIR/last_output"
 
 mkdir -p "$CMDSNAP_DIR"
 
+# Get recent commands from history (excluding cmdsnap)
+_cmdsnap_get_history() {
+    local max="${1:-10}"
+    local -a commands=()
+    local history_list=(${(f)"$(fc -l -n -50)"})
+    
+    for ((i=${#history_list[@]}; i>=1; i--)); do
+        local entry="${history_list[$i]}"
+        entry="${entry#"${entry%%[![:space:]]*}"}"
+        if [[ "$entry" != cmdsnap* ]] && [[ -n "$entry" ]]; then
+            commands+=("$entry")
+            if [[ ${#commands[@]} -ge $max ]]; then
+                break
+            fi
+        fi
+    done
+    
+    printf '%s\n' "${commands[@]}"
+}
+
+# Copy to clipboard helper
+_cmdsnap_copy() {
+    local content="$1"
+    if command -v pbcopy &> /dev/null; then
+        printf '%b' "$content" | pbcopy
+        return 0
+    elif command -v xclip &> /dev/null; then
+        printf '%b' "$content" | xclip -selection clipboard
+        return 0
+    elif command -v xsel &> /dev/null; then
+        printf '%b' "$content" | xsel --clipboard --input
+        return 0
+    elif command -v clip.exe &> /dev/null; then
+        printf '%b' "$content" | clip.exe
+        return 0
+    fi
+    return 1
+}
+
 # The main cmdsnap function
 cmdsnap() {
     local format="markdown"
-    local count=1
+    local -a selected_indices=()
+    local count=0
+    local show_list=false
     
     while [[ $# -gt 0 ]]; do
         case "$1" in
@@ -17,26 +58,36 @@ cmdsnap() {
                 format="plain"
                 shift
                 ;;
+            list|-l|--list)
+                show_list=true
+                shift
+                ;;
             help|-h|--help)
                 echo "cmdsnap - Capture and copy terminal commands with output"
                 echo ""
-                echo "Usage: cmdsnap [N] [OPTIONS]"
-                echo ""
-                echo "  cmdsnap        Capture the last command"
-                echo "  cmdsnap N      Capture the last N commands"
+                echo "Usage:"
+                echo "  cmdsnap            Capture the last command"
+                echo "  cmdsnap N          Capture the last N commands"
+                echo "  cmdsnap @N         Capture specific command #N from list"
+                echo "  cmdsnap @1 @3      Capture multiple specific commands"
+                echo "  cmdsnap list       Show recent commands with numbers"
                 echo ""
                 echo "Options:"
-                echo "  -p, --plain    Plain text format (no code block)"
-                echo "  help, -h       Show this help message"
+                echo "  -p, --plain        Plain text format (no code block)"
+                echo "  -l, list           Show recent commands"
+                echo "  -h, help           Show this help"
                 echo ""
                 echo "Examples:"
-                echo "  ls -la         Run a command"
-                echo "  cmdsnap        Copy it to clipboard"
-                echo ""
-                echo "  git status     Run some commands..."
-                echo "  npm install"
-                echo "  cmdsnap 2      Copy last 2 commands to clipboard"
+                echo "  cmdsnap            Copy last command"
+                echo "  cmdsnap 3          Copy last 3 commands"
+                echo "  cmdsnap list       See available commands"
+                echo "  cmdsnap @2         Copy command #2 from list"
+                echo "  cmdsnap @1 @4      Copy commands #1 and #4"
                 return 0
+                ;;
+            @[0-9]*)
+                selected_indices+=("${1#@}")
+                shift
                 ;;
             [0-9]*)
                 count="$1"
@@ -49,91 +100,95 @@ cmdsnap() {
         esac
     done
     
-    # Get commands from history (excluding cmdsnap itself)
-    local -a commands=()
-    local history_list=(${(f)"$(fc -l -n -50)"})
+    # Get history
+    local -a history_commands
+    history_commands=("${(@f)$(_cmdsnap_get_history 10)}")
     
-    for ((i=${#history_list[@]}; i>=1; i--)); do
-        local entry="${history_list[$i]}"
-        # Trim leading whitespace
-        entry="${entry#"${entry%%[![:space:]]*}"}"
-        if [[ "$entry" != cmdsnap* ]] && [[ -n "$entry" ]]; then
-            commands+=("$entry")
-            if [[ ${#commands[@]} -ge $count ]]; then
-                break
-            fi
-        fi
-    done
-    
-    if [[ ${#commands[@]} -eq 0 ]]; then
+    if [[ ${#history_commands[@]} -eq 0 ]]; then
         echo "No commands found in history."
         return 1
     fi
     
-    # Reverse to get chronological order (oldest first)
-    local -a ordered_commands=()
-    for ((i=${#commands[@]}; i>=1; i--)); do
-        ordered_commands+=("${commands[$i]}")
-    done
+    # Show list mode
+    if [[ "$show_list" == true ]]; then
+        echo "Recent commands:"
+        echo ""
+        local idx=1
+        for cmd in "${history_commands[@]}"; do
+            printf "  @%d  %s\n" "$idx" "$cmd"
+            ((idx++))
+        done
+        echo ""
+        echo "Use 'cmdsnap @N' to capture a specific command"
+        return 0
+    fi
     
-    # Build the result
+    # Determine which commands to capture
+    local -a commands_to_run=()
+    
+    if [[ ${#selected_indices[@]} -gt 0 ]]; then
+        # Specific commands selected with @N
+        for idx in "${selected_indices[@]}"; do
+            if [[ $idx -ge 1 ]] && [[ $idx -le ${#history_commands[@]} ]]; then
+                commands_to_run+=("${history_commands[$idx]}")
+            else
+                echo "Invalid index: @$idx (only ${#history_commands[@]} commands available)"
+                return 1
+            fi
+        done
+    elif [[ $count -gt 0 ]]; then
+        # Last N commands
+        for ((i=1; i<=count && i<=${#history_commands[@]}; i++)); do
+            commands_to_run+=("${history_commands[$i]}")
+        done
+        # Reverse for chronological order
+        local -a reversed=()
+        for ((i=${#commands_to_run[@]}; i>=1; i--)); do
+            reversed+=("${commands_to_run[$i]}")
+        done
+        commands_to_run=("${reversed[@]}")
+    else
+        # Default: last command
+        commands_to_run+=("${history_commands[1]}")
+    fi
+    
+    # Run and capture
     local result=""
-    local first=true
-    
-    echo "Capturing ${#ordered_commands[@]} command(s)..."
+    echo "Capturing ${#commands_to_run[@]} command(s)..."
     echo "---"
     
-    for cmd in "${ordered_commands[@]}"; do
+    if [[ "$format" == "markdown" ]]; then
+        result="\`\`\`\n"
+    fi
+    
+    local first=true
+    for cmd in "${commands_to_run[@]}"; do
+        if [[ "$first" != true ]]; then
+            result+="\n"
+        fi
+        first=false
+        
         echo "→ $cmd"
         local output
         output=$(eval "$cmd" 2>&1)
         echo "$output"
         echo ""
         
-        case "$format" in
-            markdown)
-                if [[ "$first" == true ]]; then
-                    result="\`\`\`\n"
-                    first=false
-                fi
-                result+="\$ ${cmd}\n"
-                if [[ -n "$output" ]]; then
-                    result+="${output}\n"
-                fi
-                result+="\n"
-                ;;
-            plain)
-                result+="\$ ${cmd}\n"
-                if [[ -n "$output" ]]; then
-                    result+="${output}\n"
-                fi
-                result+="\n"
-                ;;
-        esac
+        result+="\$ ${cmd}\n"
+        if [[ -n "$output" ]]; then
+            result+="${output}\n"
+        fi
     done
     
-    # Close code block and trim trailing newlines
     if [[ "$format" == "markdown" ]]; then
         result="${result%\\n}"
-        result="${result%\\n}"
-        result+="\n\`\`\`"
+        result+="\`\`\`"
     else
-        result="${result%\\n}"
         result="${result%\\n}"
     fi
     
-    # Copy to clipboard
-    if command -v pbcopy &> /dev/null; then
-        printf '%b' "$result" | pbcopy
-        echo "✓ Copied to clipboard!"
-    elif command -v xclip &> /dev/null; then
-        printf '%b' "$result" | xclip -selection clipboard
-        echo "✓ Copied to clipboard!"
-    elif command -v xsel &> /dev/null; then
-        printf '%b' "$result" | xsel --clipboard --input
-        echo "✓ Copied to clipboard!"
-    elif command -v clip.exe &> /dev/null; then
-        printf '%b' "$result" | clip.exe
+    # Copy
+    if _cmdsnap_copy "$result"; then
         echo "✓ Copied to clipboard!"
     else
         echo "No clipboard tool found. Output:"
