@@ -17,24 +17,25 @@ cmdsnap() {
                 format="plain"
                 shift
                 ;;
-            -n|--number)
-                count="$2"
-                shift 2
-                ;;
-            -h|--help)
+            help|-h|--help)
                 echo "cmdsnap - Capture and copy terminal commands with output"
                 echo ""
-                echo "Usage: cmdsnap [COUNT] [OPTIONS]"
+                echo "Usage: cmdsnap [N] [OPTIONS]"
                 echo ""
-                echo "Examples:"
-                echo "  cmdsnap        # capture last command"
-                echo "  cmdsnap 3      # capture last 3 commands"
-                echo "  cmdsnap -n 5   # capture last 5 commands"
+                echo "  cmdsnap        Capture the last command"
+                echo "  cmdsnap N      Capture the last N commands"
                 echo ""
                 echo "Options:"
-                echo "  -n, --number N   Capture last N commands"
-                echo "  -p, --plain      Use plain text format (no code block)"
-                echo "  -h, --help       Show this help message"
+                echo "  -p, --plain    Plain text format (no code block)"
+                echo "  help, -h       Show this help message"
+                echo ""
+                echo "Examples:"
+                echo "  ls -la         Run a command"
+                echo "  cmdsnap        Copy it to clipboard"
+                echo ""
+                echo "  git status     Run some commands..."
+                echo "  npm install"
+                echo "  cmdsnap 2      Copy last 2 commands to clipboard"
                 return 0
                 ;;
             [0-9]*)
@@ -42,7 +43,7 @@ cmdsnap() {
                 shift
                 ;;
             *)
-                echo "Unknown option: $1"
+                echo "Unknown option: $1. Use 'cmdsnap help' for usage."
                 return 1
                 ;;
         esac
