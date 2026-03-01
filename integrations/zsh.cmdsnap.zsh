@@ -83,7 +83,18 @@ cmdsnap() {
                 echo "  cmdsnap list       See available commands"
                 echo "  cmdsnap @2         Copy command #2 from list"
                 echo "  cmdsnap @1 @4      Copy commands #1 and #4"
+                echo "  cmdsnap @2..@5     Copy commands #2 through #5"
                 return 0
+                ;;
+            @[0-9]*..@[0-9]*)
+                # Range selection: @1..@5
+                local range="${1#@}"
+                local start="${range%%..@*}"
+                local end="${range##*..@}"
+                for ((n=start; n<=end; n++)); do
+                    selected_indices+=("$n")
+                done
+                shift
                 ;;
             @[0-9]*)
                 selected_indices+=("${1#@}")
