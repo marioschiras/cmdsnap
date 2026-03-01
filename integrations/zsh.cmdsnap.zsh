@@ -9,6 +9,7 @@ mkdir -p "$CMDSNAP_DIR"
 # The main cmdsnap function
 cmdsnap() {
     local format="markdown"
+    local count=1
     
     while [[ $# -gt 0 ]]; do
         case "$1" in
@@ -16,19 +17,29 @@ cmdsnap() {
                 format="plain"
                 shift
                 ;;
+            -n|--number)
+                count="$2"
+                shift 2
+                ;;
             -h|--help)
                 echo "cmdsnap - Capture and copy terminal commands with output"
                 echo ""
-                echo "Usage: Run any command, then type 'cmdsnap'"
+                echo "Usage: cmdsnap [COUNT] [OPTIONS]"
                 echo ""
-                echo "Example:"
-                echo "  ls -la"
-                echo "  cmdsnap    # re-runs ls -la, captures output, copies to clipboard"
+                echo "Examples:"
+                echo "  cmdsnap        # capture last command"
+                echo "  cmdsnap 3      # capture last 3 commands"
+                echo "  cmdsnap -n 5   # capture last 5 commands"
                 echo ""
                 echo "Options:"
-                echo "  -p, --plain    Use plain text format (no code block)"
-                echo "  -h, --help     Show this help message"
+                echo "  -n, --number N   Capture last N commands"
+                echo "  -p, --plain      Use plain text format (no code block)"
+                echo "  -h, --help       Show this help message"
                 return 0
+                ;;
+            [0-9]*)
+                count="$1"
+                shift
                 ;;
             *)
                 echo "Unknown option: $1"
@@ -37,8 +48,8 @@ cmdsnap() {
         esac
     done
     
-    # Get the last command from history (excluding cmdsnap itself)
-    local cmd=""
+    # Get commands from history (excluding cmdsnap itself)
+    local -a commands=()
     local history_list=(${(f)"$(fc -l -n -50)"})
     
     for ((i=${#history_list[@]}; i>=1; i--)); do
@@ -46,65 +57,84 @@ cmdsnap() {
         # Trim leading whitespace
         entry="${entry#"${entry%%[![:space:]]*}"}"
         if [[ "$entry" != cmdsnap* ]] && [[ -n "$entry" ]]; then
-            cmd="$entry"
-            break
+            commands+=("$entry")
+            if [[ ${#commands[@]} -ge $count ]]; then
+                break
+            fi
         fi
     done
     
-    if [[ -z "$cmd" ]]; then
-        echo "No command found in history."
+    if [[ ${#commands[@]} -eq 0 ]]; then
+        echo "No commands found in history."
         return 1
     fi
     
-    # Re-run the command to capture output
-    echo "Capturing: $cmd"
-    echo "---"
-    local output
-    output=$(eval "$cmd" 2>&1)
-    local exit_code=$?
-    echo "$output"
+    # Reverse to get chronological order (oldest first)
+    local -a ordered_commands=()
+    for ((i=${#commands[@]}; i>=1; i--)); do
+        ordered_commands+=("${commands[$i]}")
+    done
     
-    # Save output
-    echo "$output" > "$CMDSNAP_LAST_OUTPUT_FILE"
-    
-    # Format the result
+    # Build the result
     local result=""
+    local first=true
     
-    case "$format" in
-        markdown)
-            result="\`\`\`\n\$ ${cmd}\n"
-            if [[ -n "$output" ]]; then
-                result+="${output}\n"
-            fi
-            result+="\`\`\`"
-            ;;
-        plain)
-            result="\$ ${cmd}"
-            if [[ -n "$output" ]]; then
-                result+="\n${output}"
-            fi
-            ;;
-    esac
+    echo "Capturing ${#ordered_commands[@]} command(s)..."
+    echo "---"
+    
+    for cmd in "${ordered_commands[@]}"; do
+        echo "→ $cmd"
+        local output
+        output=$(eval "$cmd" 2>&1)
+        echo "$output"
+        echo ""
+        
+        case "$format" in
+            markdown)
+                if [[ "$first" == true ]]; then
+                    result="\`\`\`\n"
+                    first=false
+                fi
+                result+="\$ ${cmd}\n"
+                if [[ -n "$output" ]]; then
+                    result+="${output}\n"
+                fi
+                result+="\n"
+                ;;
+            plain)
+                result+="\$ ${cmd}\n"
+                if [[ -n "$output" ]]; then
+                    result+="${output}\n"
+                fi
+                result+="\n"
+                ;;
+        esac
+    done
+    
+    # Close code block and trim trailing newlines
+    if [[ "$format" == "markdown" ]]; then
+        result="${result%\\n}"
+        result="${result%\\n}"
+        result+="\n\`\`\`"
+    else
+        result="${result%\\n}"
+        result="${result%\\n}"
+    fi
     
     # Copy to clipboard
     if command -v pbcopy &> /dev/null; then
         printf '%b' "$result" | pbcopy
-        echo ""
         echo "✓ Copied to clipboard!"
     elif command -v xclip &> /dev/null; then
         printf '%b' "$result" | xclip -selection clipboard
-        echo ""
         echo "✓ Copied to clipboard!"
     elif command -v xsel &> /dev/null; then
         printf '%b' "$result" | xsel --clipboard --input
-        echo ""
         echo "✓ Copied to clipboard!"
     elif command -v clip.exe &> /dev/null; then
         printf '%b' "$result" | clip.exe
-        echo ""
         echo "✓ Copied to clipboard!"
     else
-        echo ""
         echo "No clipboard tool found. Output:"
         printf '%b\n' "$result"
         return 1
