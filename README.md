@@ -1,53 +1,60 @@
 # cmdsnap
 
-Capture terminal commands and their output for easy sharing. Perfect for documentation, bug reports, and tutorials.
+Capture terminal commands for easy sharing. Perfect for documentation, bug reports, and tutorials.
 
 ## Installation
 
-### Homebrew (macOS/Linux)
+### macOS/Linux
 
+**Homebrew:**
 ```bash
 brew install marioschiras/cmdsnap/cmdsnap
 ```
 
-### Manual Installation
-
+**Manual:**
 ```bash
-# Clone the repository
 git clone https://github.com/marioschiras/cmdsnap.git ~/.cmdsnap
-
-# Add to your .zshrc
 echo 'source ~/.cmdsnap/integrations/zsh.cmdsnap.zsh' >> ~/.zshrc
-
-# Reload your shell
 source ~/.zshrc
 ```
 
-### Zsh Plugin Managers
-
-**zinit:**
+**Zsh Plugin Managers:**
 ```bash
+# zinit
 zinit light marioschiras/cmdsnap
-```
 
-**antigen:**
-```bash
+# antigen
 antigen bundle marioschiras/cmdsnap
+
+# zplug
+zplug "marioschiras/cmdsnap"
 ```
 
-**zplug:**
-```bash
-zplug "marioschiras/cmdsnap"
+### Windows (PowerShell)
+
+**One-line install:**
+```powershell
+irm https://raw.githubusercontent.com/marioschiras/cmdsnap/master/install.ps1 | iex
+```
+
+**Manual:**
+```powershell
+# Download the script
+Invoke-WebRequest -Uri "https://raw.githubusercontent.com/marioschiras/cmdsnap/master/integrations/cmdsnap.ps1" -OutFile "$env:USERPROFILE\.cmdsnap\cmdsnap.ps1"
+
+# Add to your PowerShell profile
+Add-Content $PROFILE '. "$env:USERPROFILE\.cmdsnap\cmdsnap.ps1"'
 ```
 
 ## Usage
 
 ```bash
-cmdsnap            # Capture the last command and its output
-cmdsnap 3          # Capture the last 3 commands
+cmdsnap            # Copy the last command
+cmdsnap 3          # Copy the last 3 commands
 cmdsnap list       # Show recent commands with numbers
-cmdsnap @2         # Capture specific command #2 from list
-cmdsnap @1 @4      # Capture multiple specific commands
+cmdsnap @2         # Copy specific command #2 from list
+cmdsnap @1 @4      # Copy multiple specific commands
+cmdsnap @2..@5     # Copy commands #2 through #5
 ```
 
 ### Options
@@ -60,35 +67,25 @@ cmdsnap @1 @4      # Capture multiple specific commands
 
 ## Examples
 
-### Capture the last command
+### Copy the last command
 
-```bash
-$ ls -la
+```
+$ git status
 $ cmdsnap
-Capturing 1 command(s)...
----
-→ ls -la
-total 0
-drwxr-xr-x  3 user  staff  96 Jan  1 12:00 .
-drwxr-xr-x  5 user  staff 160 Jan  1 12:00 ..
-
-✓ Copied to clipboard!
+✓ Copied 1 command(s) to clipboard!
 ```
 
 The clipboard now contains:
 
 ~~~
 ```
-$ ls -la
-total 0
-drwxr-xr-x  3 user  staff  96 Jan  1 12:00 .
-drwxr-xr-x  5 user  staff 160 Jan  1 12:00 ..
+git status
 ```
 ~~~
 
 ### List and select specific commands
 
-```bash
+```
 $ cmdsnap list
 Recent commands:
 
@@ -97,22 +94,26 @@ Recent commands:
   @3  cat package.json
   @4  ls -la
 
-Use 'cmdsnap @N' to capture a specific command
+Use 'cmdsnap @N' to copy a specific command
 
-$ cmdsnap @2 @4    # Captures npm install and ls -la
+$ cmdsnap @2 @4
+✓ Copied 2 command(s) to clipboard!
 ```
 
 ## How It Works
 
-1. `cmdsnap` looks at your shell history
-2. Re-runs the selected command(s) to capture fresh output
-3. Formats the result as a markdown code block
-4. Copies everything to your clipboard
+1. `cmdsnap` retrieves commands from your shell history
+2. Formats them as a markdown code block
+3. Copies to your clipboard
 
 ## Requirements
 
+**macOS/Linux:**
 - Zsh shell
-- One of: `pbcopy` (macOS), `xclip`, `xsel` (Linux), or `clip.exe` (WSL)
+- Clipboard tool: `pbcopy` (macOS), `xclip`, `xsel` (Linux), or `clip.exe` (WSL)
+
+**Windows:**
+- PowerShell 5.1+ or PowerShell Core
 
 ## License
 
