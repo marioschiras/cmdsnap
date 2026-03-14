@@ -6,17 +6,16 @@ Capture terminal commands for easy sharing. Perfect for documentation, bug repor
 
 ### macOS/Linux
 
+**Quick install:**
+```bash
+curl -fsSL https://raw.githubusercontent.com/marioschiras/cmdsnap/master/install.sh | bash
+source ~/.zshrc
+```
+
 **Homebrew:**
 ```bash
 brew install marioschiras/cmdsnap/cmdsnap
 cmdsnap-setup
-source ~/.zshrc
-```
-
-**Manual:**
-```bash
-git clone https://github.com/marioschiras/cmdsnap.git ~/.cmdsnap
-echo 'source ~/.cmdsnap/integrations/zsh.cmdsnap.zsh' >> ~/.zshrc
 source ~/.zshrc
 ```
 
@@ -30,6 +29,13 @@ antigen bundle marioschiras/cmdsnap
 
 # zplug
 zplug "marioschiras/cmdsnap"
+```
+
+**Manual:**
+```bash
+git clone https://github.com/marioschiras/cmdsnap.git ~/.cmdsnap
+echo 'source ~/.cmdsnap/integrations/zsh.cmdsnap.zsh' >> ~/.zshrc
+source ~/.zshrc
 ```
 
 ### Windows (PowerShell)
