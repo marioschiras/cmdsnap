@@ -9,6 +9,8 @@ Capture terminal commands for easy sharing. Perfect for documentation, bug repor
 **Homebrew:**
 ```bash
 brew install marioschiras/cmdsnap/cmdsnap
+cmdsnap-setup
+source ~/.zshrc
 ```
 
 **Manual:**
@@ -39,11 +41,15 @@ irm https://raw.githubusercontent.com/marioschiras/cmdsnap/master/install.ps1 | 
 
 **Manual:**
 ```powershell
-# Download the script
+# Create directory and download
+mkdir "$env:USERPROFILE\.cmdsnap" -Force
 Invoke-WebRequest -Uri "https://raw.githubusercontent.com/marioschiras/cmdsnap/master/integrations/cmdsnap.ps1" -OutFile "$env:USERPROFILE\.cmdsnap\cmdsnap.ps1"
 
 # Add to your PowerShell profile
 Add-Content $PROFILE '. "$env:USERPROFILE\.cmdsnap\cmdsnap.ps1"'
+
+# Restart PowerShell or run:
+. $PROFILE
 ```
 
 ## Usage
